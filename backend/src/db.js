@@ -6,6 +6,20 @@ dotenv.config();
 const { Pool } = pg;
 
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
+const databaseUrlHost = hasDatabaseUrl
+  ? new URL(process.env.DATABASE_URL).hostname
+  : "";
+const isLocalDatabaseHost = ["localhost", "127.0.0.1", "::1"].includes(
+  databaseUrlHost
+);
+const useSsl =
+  process.env.DATABASE_SSL === "false"
+    ? false
+    : hasDatabaseUrl && !isLocalDatabaseHost
+      ? { rejectUnauthorized: false }
+      : process.env.NODE_ENV === "production"
+        ? { rejectUnauthorized: false }
+        : false;
 
 // Helpful debug info when DB connection fails (no secrets printed)
 const connectionMode = hasDatabaseUrl
@@ -19,10 +33,7 @@ console.log(`[db] Connecting using: ${connectionMode}`);
 const pool = hasDatabaseUrl
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl:
-        process.env.NODE_ENV === "production"
-          ? { rejectUnauthorized: false }
-          : false,
+      ssl: useSsl,
     })
   : new Pool({
       host: process.env.PGHOST || "localhost",
@@ -30,10 +41,7 @@ const pool = hasDatabaseUrl
       user: process.env.PGUSER || "postgres",
       password: process.env.PGPASSWORD || "postgres",
       database: process.env.PGDATABASE || "attendance_app",
-      ssl:
-        process.env.NODE_ENV === "production"
-          ? { rejectUnauthorized: false }
-          : false,
+      ssl: useSsl,
     });
 
 export const query = (text, params = []) => pool.query(text, params);
