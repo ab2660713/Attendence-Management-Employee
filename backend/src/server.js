@@ -10,7 +10,8 @@ const __dirname = path.dirname(__filename);
 const configPath = path.join(__dirname, "..", "data", "config.json");
 const adminSessions = new Map();
 const employeeSessions = new Map();
-const adminPasswordSeed = process.env.ADMIN_PASSWORD || "admin123";
+const adminPasswordFromEnv = process.env.ADMIN_PASSWORD;
+const adminPasswordSeed = adminPasswordFromEnv || "admin123";
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "*")
   .split(",")
@@ -132,7 +133,22 @@ const getStoredAdminPassword = async () => {
 };
 const ensureAdminPassword = async () => {
   const stored = await getStoredAdminPassword();
-  if (stored) return;
+  if (stored) {
+    if (
+      adminPasswordFromEnv &&
+      !verifyAdminPassword(adminPasswordFromEnv, stored)
+    ) {
+      await query(
+        `UPDATE admin_settings
+         SET setting_value = $1,
+             updated_at = NOW()
+         WHERE setting_key = 'admin_password'`,
+        [hashAdminPassword(adminPasswordFromEnv)]
+      );
+      console.log("[admin] Admin password synced from ADMIN_PASSWORD env.");
+    }
+    return;
+  }
   await query(
     `INSERT INTO admin_settings (setting_key, setting_value)
      VALUES ('admin_password', $1)`,
