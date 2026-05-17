@@ -97,7 +97,7 @@ The admin password is controlled by `ADMIN_PASSWORD`.
 Locally:
 
 ```env
-ADMIN_PASSWORD=admin123
+ADMIN_PASSWORD=****
 ```
 
 On Render:
