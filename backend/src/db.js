@@ -7,10 +7,22 @@ const { Pool } = pg;
 
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
+// Helpful debug info when DB connection fails (no secrets printed)
+const connectionMode = hasDatabaseUrl
+  ? "DATABASE_URL"
+  : `PGHOST=${process.env.PGHOST || "localhost"}, PGPORT=${
+      process.env.PGPORT || 5432
+    }`;
+console.log(`[db] DATABASE_URL: ${hasDatabaseUrl ? "set" : "missing"}`);
+console.log(`[db] Connecting using: ${connectionMode}`);
+
 const pool = hasDatabaseUrl
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+      ssl:
+        process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
     })
   : new Pool({
       host: process.env.PGHOST || "localhost",
@@ -18,7 +30,10 @@ const pool = hasDatabaseUrl
       user: process.env.PGUSER || "postgres",
       password: process.env.PGPASSWORD || "postgres",
       database: process.env.PGDATABASE || "attendance_app",
-      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+      ssl:
+        process.env.NODE_ENV === "production"
+          ? { rejectUnauthorized: false }
+          : false,
     });
 
 export const query = (text, params = []) => pool.query(text, params);

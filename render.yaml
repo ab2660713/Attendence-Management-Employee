@@ -7,6 +7,8 @@ services:
     startCommand: npm start
     autoDeploy: true
     envVars:
+      - key: DATABASE_URL
+        sync: false
       - key: PGHOST
         sync: false
       - key: PGPORT

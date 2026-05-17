@@ -37,11 +37,19 @@ const sendJson = (res, statusCode, payload, origin = "*") => {
     "Access-Control-Allow-Headers": corsAllowHeaders,
   };
 
-  res.writeHead(statusCode, { "Content-Type": "application/json", ...corsHeaders });
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json",
+    ...corsHeaders,
+  });
   res.end(JSON.stringify(payload));
 };
 
-const sendCsv = (res, csv, origin = "*", filename = "attendance-export.csv") => {
+const sendCsv = (
+  res,
+  csv,
+  origin = "*",
+  filename = "attendance-export.csv"
+) => {
   res.writeHead(200, {
     "Content-Type": "text/csv; charset=utf-8",
     "Content-Disposition": `attachment; filename="${filename}"`,
@@ -53,8 +61,15 @@ const sendCsv = (res, csv, origin = "*", filename = "attendance-export.csv") => 
   res.end(`\uFEFF${csv}`);
 };
 
-const normalizeText = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "");
-const normalizeIp = (value) => String(value || "").trim().replace(/^::ffff:/, "");
+const normalizeText = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+const normalizeIp = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/^::ffff:/, "");
 const parseIpList = (value) =>
   String(value || "")
     .split(/[\n,]+/)
@@ -68,28 +83,51 @@ const getRequestIp = (req) => {
   return forwardedFor || normalizeIp(req.socket.remoteAddress);
 };
 const isOfficeIpAllowedForConfig = (ip, config) => {
-  const configIps = Array.isArray(config?.office?.allowedIps) ? config.office.allowedIps : [];
+  const configIps = Array.isArray(config?.office?.allowedIps)
+    ? config.office.allowedIps
+    : [];
   const activeAllowedIps = configIps.length ? configIps : allowedOfficeIps;
   if (!activeAllowedIps.length) return true;
   const normalizedIp = normalizeIp(ip);
-  return activeAllowedIps.some((allowedIp) => normalizeIp(allowedIp) === normalizedIp);
+  return activeAllowedIps.some(
+    (allowedIp) => normalizeIp(allowedIp) === normalizedIp
+  );
 };
-const readConfig = async () => JSON.parse(await fs.readFile(configPath, "utf8"));
+const readConfig = async () =>
+  JSON.parse(await fs.readFile(configPath, "utf8"));
 const writeConfig = async (config) => {
-  await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  await fs.writeFile(
+    configPath,
+    `${JSON.stringify(config, null, 2)}\n`,
+    "utf8"
+  );
 };
-const hashAdminPassword = (password, salt = crypto.randomBytes(16).toString("hex")) => {
-  const digest = crypto.createHash("sha256").update(`${salt}:${password}`).digest("hex");
+const hashAdminPassword = (
+  password,
+  salt = crypto.randomBytes(16).toString("hex")
+) => {
+  const digest = crypto
+    .createHash("sha256")
+    .update(`${salt}:${password}`)
+    .digest("hex");
   return `${salt}:${digest}`;
 };
 const verifyAdminPassword = (password, storedValue) => {
   const [salt, digest] = String(storedValue || "").split(":");
   if (!salt || !digest) return false;
-  const expected = crypto.createHash("sha256").update(`${salt}:${password}`).digest("hex");
-  return digest.length === expected.length && crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(expected));
+  const expected = crypto
+    .createHash("sha256")
+    .update(`${salt}:${password}`)
+    .digest("hex");
+  return (
+    digest.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(expected))
+  );
 };
 const getStoredAdminPassword = async () => {
-  const res = await query("SELECT setting_value FROM admin_settings WHERE setting_key = 'admin_password'");
+  const res = await query(
+    "SELECT setting_value FROM admin_settings WHERE setting_key = 'admin_password'"
+  );
   return res.rows[0]?.setting_value || null;
 };
 const ensureAdminPassword = async () => {
@@ -101,8 +139,12 @@ const ensureAdminPassword = async () => {
     [hashAdminPassword(adminPasswordSeed)]
   );
 };
-const getISTDate = (timestamp = Date.now()) => new Date(timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-const getISTMonth = (timestamp = Date.now()) => new Date(timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }).slice(0, 7);
+const getISTDate = (timestamp = Date.now()) =>
+  new Date(timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+const getISTMonth = (timestamp = Date.now()) =>
+  new Date(timestamp)
+    .toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
+    .slice(0, 7);
 
 const toISTDateTime = (timestamp) => {
   if (!timestamp) return null;
@@ -118,11 +160,14 @@ const toISTDateTime = (timestamp) => {
   });
 };
 
-const parseISTDateTime = (dateString, timeString) => new Date(`${dateString}T${timeString}:00+05:30`).getTime();
+const parseISTDateTime = (dateString, timeString) =>
+  new Date(`${dateString}T${timeString}:00+05:30`).getTime();
 
 const toMinutes = (hhmm) => {
-  const [hours, minutes] = String(hhmm || "0:0").split(":").map((part) => Number(part));
-  return (hours * 60) + minutes;
+  const [hours, minutes] = String(hhmm || "0:0")
+    .split(":")
+    .map((part) => Number(part));
+  return hours * 60 + minutes;
 };
 
 const padTwo = (value) => String(value).padStart(2, "0");
@@ -131,15 +176,25 @@ const getMonthBounds = (month) => {
   const safeMonth = /^\d{4}-\d{2}$/.test(month) ? month : getISTMonth();
   const start = new Date(`${safeMonth}-01T00:00:00+05:30`).getTime();
   const [year, monthPart] = safeMonth.split("-").map(Number);
-  const nextMonthStart = monthPart === 12
-    ? new Date(`${year + 1}-01-01T00:00:00+05:30`).getTime()
-    : new Date(`${year}-${padTwo(monthPart + 1)}-01T00:00:00+05:30`).getTime();
+  const nextMonthStart =
+    monthPart === 12
+      ? new Date(`${year + 1}-01-01T00:00:00+05:30`).getTime()
+      : new Date(
+          `${year}-${padTwo(monthPart + 1)}-01T00:00:00+05:30`
+        ).getTime();
   return { start, end: nextMonthStart, month: safeMonth };
 };
 
 const getPagination = (url, defaultPageSize = 10) => {
-  const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1);
-  const pageSizeRaw = Number.parseInt(url.searchParams.get("pageSize") || String(defaultPageSize), 10) || defaultPageSize;
+  const page = Math.max(
+    1,
+    Number.parseInt(url.searchParams.get("page") || "1", 10) || 1
+  );
+  const pageSizeRaw =
+    Number.parseInt(
+      url.searchParams.get("pageSize") || String(defaultPageSize),
+      10
+    ) || defaultPageSize;
   const pageSize = Math.min(50, Math.max(5, pageSizeRaw));
   const offset = (page - 1) * pageSize;
   return { page, pageSize, offset };
@@ -152,7 +207,10 @@ const haversineMeters = (lat1, lon1, lat2, lon2) => {
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   return 2 * earthRadius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
@@ -184,8 +242,10 @@ const csvCell = (value) => {
   return text;
 };
 
-const getAdminToken = (req) => String(req.headers["x-admin-token"] || "").trim();
-const getEmployeeToken = (req) => String(req.headers["x-employee-token"] || "").trim();
+const getAdminToken = (req) =>
+  String(req.headers["x-admin-token"] || "").trim();
+const getEmployeeToken = (req) =>
+  String(req.headers["x-employee-token"] || "").trim();
 
 const requireAdminSession = (req, res, origin) => {
   const token = getAdminToken(req);
@@ -207,7 +267,12 @@ const requireEmployeeSession = (req, res, origin, employeeId) => {
     return null;
   }
   if (session.employeeId !== employeeId) {
-    sendJson(res, 403, { message: "Employee token does not match this employee." }, origin);
+    sendJson(
+      res,
+      403,
+      { message: "Employee token does not match this employee." },
+      origin
+    );
     return null;
   }
   return session;
@@ -233,21 +298,34 @@ const buildDailyMetrics = (row, config) => {
   const shiftEndMinutes = toMinutes(config.shift?.end || "18:30");
   const graceMinutes = Number(config.shift?.graceMinutes || 0);
   const lateThreshold = shiftStartMinutes + graceMinutes;
-  const lateThresholdTime = `${padTwo(Math.floor(lateThreshold / 60))}:${padTwo(lateThreshold % 60)}`;
+  const lateThresholdTime = `${padTwo(Math.floor(lateThreshold / 60))}:${padTwo(
+    lateThreshold % 60
+  )}`;
   const dayStart = parseISTDateTime(row.attendance_date, "00:00");
   const checkInTime = row.check_in_at ? Number(row.check_in_at) : null;
   const checkOutTime = row.check_out_at ? Number(row.check_out_at) : null;
-  const shiftStartTime = parseISTDateTime(row.attendance_date, config.shift?.start || "09:30");
-  const shiftEndTime = parseISTDateTime(row.attendance_date, config.shift?.end || "18:30");
-  const thresholdTime = parseISTDateTime(row.attendance_date, lateThresholdTime);
+  const shiftStartTime = parseISTDateTime(
+    row.attendance_date,
+    config.shift?.start || "09:30"
+  );
+  const shiftEndTime = parseISTDateTime(
+    row.attendance_date,
+    config.shift?.end || "18:30"
+  );
+  const thresholdTime = parseISTDateTime(
+    row.attendance_date,
+    lateThresholdTime
+  );
 
-  const lateByMinutes = checkInTime && checkInTime > thresholdTime
-    ? Math.round((checkInTime - thresholdTime) / 60000)
-    : 0;
+  const lateByMinutes =
+    checkInTime && checkInTime > thresholdTime
+      ? Math.round((checkInTime - thresholdTime) / 60000)
+      : 0;
 
-  const overtimeMinutes = checkOutTime && checkOutTime > shiftEndTime
-    ? Math.round((checkOutTime - shiftEndTime) / 60000)
-    : 0;
+  const overtimeMinutes =
+    checkOutTime && checkOutTime > shiftEndTime
+      ? Math.round((checkOutTime - shiftEndTime) / 60000)
+      : 0;
 
   return {
     dayStart,
@@ -288,7 +366,12 @@ const server = http.createServer(async (req, res) => {
   const corsOrigin = getCorsOrigin(requestOrigin);
 
   if (!corsOrigin) {
-    sendJson(res, 403, { message: "Origin is not allowed by CORS policy." }, "*");
+    sendJson(
+      res,
+      403,
+      { message: "Origin is not allowed by CORS policy." },
+      "*"
+    );
     return;
   }
 
@@ -306,7 +389,12 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
 
     if (req.method === "GET" && url.pathname === "/api/health") {
-      sendJson(res, 200, { ok: true, message: "Attendance backend is running" }, corsOrigin);
+      sendJson(
+        res,
+        200,
+        { ok: true, message: "Attendance backend is running" },
+        corsOrigin
+      );
       return;
     }
 
@@ -317,11 +405,27 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/auth/login") {
       const body = await parseBody(req);
-      const rawInput = String(body.employeeId || "").trim().toUpperCase();
+      const rawInput = String(body.employeeId || "")
+        .trim()
+        .toUpperCase();
       const deviceToken = String(body.deviceToken || "").trim();
-      const deviceLabel = String(body.deviceLabel || "").trim().slice(0, 255);
-      if (!rawInput) return sendJson(res, 400, { message: "Employee ID is required." }, corsOrigin);
-      if (!deviceToken) return sendJson(res, 400, { message: "Device information is required." }, corsOrigin);
+      const deviceLabel = String(body.deviceLabel || "")
+        .trim()
+        .slice(0, 255);
+      if (!rawInput)
+        return sendJson(
+          res,
+          400,
+          { message: "Employee ID is required." },
+          corsOrigin
+        );
+      if (!deviceToken)
+        return sendJson(
+          res,
+          400,
+          { message: "Device information is required." },
+          corsOrigin
+        );
 
       const dbRes = await query(
         "SELECT id, name, department, device_token, device_label FROM employees WHERE active = true AND id = $1",
@@ -329,9 +433,20 @@ const server = http.createServer(async (req, res) => {
       );
       const employee = dbRes.rows[0];
 
-      if (!employee) return sendJson(res, 404, { message: "Employee not found." }, corsOrigin);
+      if (!employee)
+        return sendJson(
+          res,
+          404,
+          { message: "Employee not found." },
+          corsOrigin
+        );
       if (employee.device_token && employee.device_token !== deviceToken) {
-        return sendJson(res, 403, { message: "This employee is locked to another company laptop." }, corsOrigin);
+        return sendJson(
+          res,
+          403,
+          { message: "This employee is locked to another company laptop." },
+          corsOrigin
+        );
       }
 
       if (!employee.device_token) {
@@ -359,7 +474,11 @@ const server = http.createServer(async (req, res) => {
           message: employee.device_token
             ? "Company laptop verified. Login successful."
             : "Company laptop approved and login successful.",
-          employee: { id: employee.id, name: employee.name, department: employee.department },
+          employee: {
+            id: employee.id,
+            name: employee.name,
+            department: employee.department,
+          },
           token,
         },
         corsOrigin
@@ -385,7 +504,10 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === "POST" && url.pathname === "/api/admin/change-password") {
+    if (
+      req.method === "POST" &&
+      url.pathname === "/api/admin/change-password"
+    ) {
       if (!requireAdminSession(req, res, corsOrigin)) return;
       const body = await parseBody(req);
       const currentPassword = String(body.currentPassword || "");
@@ -393,21 +515,44 @@ const server = http.createServer(async (req, res) => {
       const confirmPassword = String(body.confirmPassword || "");
 
       if (!currentPassword || !newPassword || !confirmPassword) {
-        sendJson(res, 400, { message: "Current, new, and confirm password are required." }, corsOrigin);
+        sendJson(
+          res,
+          400,
+          { message: "Current, new, and confirm password are required." },
+          corsOrigin
+        );
         return;
       }
       if (newPassword !== confirmPassword) {
-        sendJson(res, 400, { message: "New password and confirm password must match." }, corsOrigin);
+        sendJson(
+          res,
+          400,
+          { message: "New password and confirm password must match." },
+          corsOrigin
+        );
         return;
       }
       if (newPassword.length < 6) {
-        sendJson(res, 400, { message: "New password must be at least 6 characters long." }, corsOrigin);
+        sendJson(
+          res,
+          400,
+          { message: "New password must be at least 6 characters long." },
+          corsOrigin
+        );
         return;
       }
 
       const storedPassword = await getStoredAdminPassword();
-      if (!storedPassword || !verifyAdminPassword(currentPassword, storedPassword)) {
-        sendJson(res, 401, { message: "Current admin password is invalid." }, corsOrigin);
+      if (
+        !storedPassword ||
+        !verifyAdminPassword(currentPassword, storedPassword)
+      ) {
+        sendJson(
+          res,
+          401,
+          { message: "Current admin password is invalid." },
+          corsOrigin
+        );
         return;
       }
 
@@ -419,7 +564,12 @@ const server = http.createServer(async (req, res) => {
         [hashAdminPassword(newPassword)]
       );
 
-      sendJson(res, 200, { message: "Admin password changed successfully." }, corsOrigin);
+      sendJson(
+        res,
+        200,
+        { message: "Admin password changed successfully." },
+        corsOrigin
+      );
       return;
     }
 
@@ -428,7 +578,9 @@ const server = http.createServer(async (req, res) => {
       const { page, pageSize, offset } = getPagination(url, 10);
       const rawSearch = String(url.searchParams.get("search") || "").trim();
       const search = normalizeText(rawSearch);
-      const department = String(url.searchParams.get("department") || "").trim();
+      const department = String(
+        url.searchParams.get("department") || ""
+      ).trim();
       const clauses = ["active = true"];
       const params = [];
 
@@ -448,7 +600,10 @@ const server = http.createServer(async (req, res) => {
       }
 
       const whereClause = clauses.join(" AND ");
-      const countRes = await query(`SELECT COUNT(*)::int AS count FROM employees WHERE ${whereClause}`, params);
+      const countRes = await query(
+        `SELECT COUNT(*)::int AS count FROM employees WHERE ${whereClause}`,
+        params
+      );
       const total = countRes.rows[0].count;
       const dbRes = await query(
         `SELECT id, name, department, device_token, device_label, device_bound_at
@@ -480,16 +635,26 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/employees") {
       if (!requireAdminSession(req, res, corsOrigin)) return;
       const body = await parseBody(req);
-      const id = String(body.id || "").trim().toUpperCase();
+      const id = String(body.id || "")
+        .trim()
+        .toUpperCase();
       const name = String(body.name || "").trim();
       const department = String(body.department || "").trim();
 
       if (!id || !name || !department) {
-        sendJson(res, 400, { message: "id, name, and department are required." }, corsOrigin);
+        sendJson(
+          res,
+          400,
+          { message: "id, name, and department are required." },
+          corsOrigin
+        );
         return;
       }
 
-      const exists = await query("SELECT id, active, device_token, device_label, device_bound_at FROM employees WHERE id = $1", [id]);
+      const exists = await query(
+        "SELECT id, active, device_token, device_label, device_bound_at FROM employees WHERE id = $1",
+        [id]
+      );
 
       const insertRes = await query(
         `INSERT INTO employees (id, name, department, active, device_token, device_label, device_bound_at)
@@ -499,55 +664,106 @@ const server = http.createServer(async (req, res) => {
              department = EXCLUDED.department,
              active = true
          RETURNING id, name, department`,
-        [id, name, department, exists.rows[0]?.device_token || null, exists.rows[0]?.device_label || null, exists.rows[0]?.device_bound_at || null]
+        [
+          id,
+          name,
+          department,
+          exists.rows[0]?.device_token || null,
+          exists.rows[0]?.device_label || null,
+          exists.rows[0]?.device_bound_at || null,
+        ]
       );
 
       sendJson(
         res,
         exists.rows[0] ? 200 : 201,
-        { message: exists.rows[0] ? "Employee restored successfully." : "Employee added successfully.", employee: insertRes.rows[0] },
+        {
+          message: exists.rows[0]
+            ? "Employee restored successfully."
+            : "Employee added successfully.",
+          employee: insertRes.rows[0],
+        },
         corsOrigin
       );
       return;
     }
 
-    if (req.method === "POST" && url.pathname === "/api/admin/remove-employee") {
+    if (
+      req.method === "POST" &&
+      url.pathname === "/api/admin/remove-employee"
+    ) {
       if (!requireAdminSession(req, res, corsOrigin)) return;
       const body = await parseBody(req);
-      const id = String(body.id || "").trim().toUpperCase();
+      const id = String(body.id || "")
+        .trim()
+        .toUpperCase();
       if (!id) {
         sendJson(res, 400, { message: "Employee ID is required." }, corsOrigin);
         return;
       }
 
-      const exists = await query("SELECT id FROM employees WHERE id = $1 AND active = true", [id]);
+      const exists = await query(
+        "SELECT id FROM employees WHERE id = $1 AND active = true",
+        [id]
+      );
       if (!exists.rows[0]) {
-        sendJson(res, 404, { message: "Employee not found or already removed." }, corsOrigin);
+        sendJson(
+          res,
+          404,
+          { message: "Employee not found or already removed." },
+          corsOrigin
+        );
         return;
       }
 
-      await query("UPDATE employees SET active = false, device_token = NULL, device_label = NULL, device_bound_at = NULL WHERE id = $1", [id]);
-      sendJson(res, 200, { message: "Employee removed successfully." }, corsOrigin);
+      await query(
+        "UPDATE employees SET active = false, device_token = NULL, device_label = NULL, device_bound_at = NULL WHERE id = $1",
+        [id]
+      );
+      sendJson(
+        res,
+        200,
+        { message: "Employee removed successfully." },
+        corsOrigin
+      );
       return;
     }
 
     if (req.method === "POST" && url.pathname === "/api/admin/reset-device") {
       if (!requireAdminSession(req, res, corsOrigin)) return;
       const body = await parseBody(req);
-      const id = String(body.id || "").trim().toUpperCase();
+      const id = String(body.id || "")
+        .trim()
+        .toUpperCase();
       if (!id) {
         sendJson(res, 400, { message: "Employee ID is required." }, corsOrigin);
         return;
       }
 
-      const exists = await query("SELECT id FROM employees WHERE id = $1 AND active = true", [id]);
+      const exists = await query(
+        "SELECT id FROM employees WHERE id = $1 AND active = true",
+        [id]
+      );
       if (!exists.rows[0]) {
-        sendJson(res, 404, { message: "Employee not found or inactive." }, corsOrigin);
+        sendJson(
+          res,
+          404,
+          { message: "Employee not found or inactive." },
+          corsOrigin
+        );
         return;
       }
 
-      await query("UPDATE employees SET device_token = NULL, device_label = NULL, device_bound_at = NULL WHERE id = $1", [id]);
-      sendJson(res, 200, { message: "Company laptop binding reset successfully." }, corsOrigin);
+      await query(
+        "UPDATE employees SET device_token = NULL, device_label = NULL, device_bound_at = NULL WHERE id = $1",
+        [id]
+      );
+      sendJson(
+        res,
+        200,
+        { message: "Company laptop binding reset successfully." },
+        corsOrigin
+      );
       return;
     }
 
@@ -567,12 +783,26 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { message: "Office name is required." }, corsOrigin);
         return;
       }
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(radiusMeters)) {
-        sendJson(res, 400, { message: "Valid latitude, longitude, and radius are required." }, corsOrigin);
+      if (
+        !Number.isFinite(latitude) ||
+        !Number.isFinite(longitude) ||
+        !Number.isFinite(radiusMeters)
+      ) {
+        sendJson(
+          res,
+          400,
+          { message: "Valid latitude, longitude, and radius are required." },
+          corsOrigin
+        );
         return;
       }
       if (radiusMeters < 10 || radiusMeters > 5000) {
-        sendJson(res, 400, { message: "Radius must be between 10 and 5000 meters." }, corsOrigin);
+        sendJson(
+          res,
+          400,
+          { message: "Radius must be between 10 and 5000 meters." },
+          corsOrigin
+        );
         return;
       }
 
@@ -587,17 +817,33 @@ const server = http.createServer(async (req, res) => {
       };
 
       await writeConfig(config);
-      sendJson(res, 200, { message: "Office location updated successfully.", office: config.office }, corsOrigin);
+      sendJson(
+        res,
+        200,
+        {
+          message: "Office location updated successfully.",
+          office: config.office,
+        },
+        corsOrigin
+      );
       return;
     }
 
-    if (req.method === "POST" && url.pathname === "/api/admin/import-employees") {
+    if (
+      req.method === "POST" &&
+      url.pathname === "/api/admin/import-employees"
+    ) {
       if (!requireAdminSession(req, res, corsOrigin)) return;
 
       const body = await parseBody(req);
       const employees = Array.isArray(body.employees) ? body.employees : [];
       if (!employees.length) {
-        sendJson(res, 400, { message: "employees array is required." }, corsOrigin);
+        sendJson(
+          res,
+          400,
+          { message: "employees array is required." },
+          corsOrigin
+        );
         return;
       }
 
@@ -606,7 +852,9 @@ const server = http.createServer(async (req, res) => {
       let skipped = 0;
 
       for (const item of employees) {
-        const id = String(item.id || "").trim().toUpperCase();
+        const id = String(item.id || "")
+          .trim()
+          .toUpperCase();
         const name = String(item.name || "").trim();
         const department = String(item.department || "").trim();
 
@@ -615,7 +863,9 @@ const server = http.createServer(async (req, res) => {
           continue;
         }
 
-        const exists = await query("SELECT id FROM employees WHERE id = $1", [id]);
+        const exists = await query("SELECT id FROM employees WHERE id = $1", [
+          id,
+        ]);
         await query(
           `INSERT INTO employees (id, name, department)
            VALUES ($1, $2, $3)
@@ -643,7 +893,10 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === "GET" && url.pathname === "/api/admin/export-attendance") {
+    if (
+      req.method === "GET" &&
+      url.pathname === "/api/admin/export-attendance"
+    ) {
       if (!requireAdminSession(req, res, corsOrigin)) return;
 
       const dbRes = await query(
@@ -690,8 +943,16 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && url.pathname === "/api/attendance/today") {
-      const employeeId = String(url.searchParams.get("employeeId") || "").trim().toUpperCase();
-      if (!employeeId) return sendJson(res, 400, { message: "employeeId is required." }, corsOrigin);
+      const employeeId = String(url.searchParams.get("employeeId") || "")
+        .trim()
+        .toUpperCase();
+      if (!employeeId)
+        return sendJson(
+          res,
+          400,
+          { message: "employeeId is required." },
+          corsOrigin
+        );
       if (!requireEmployeeSession(req, res, corsOrigin, employeeId)) return;
 
       const today = getISTDate();
@@ -703,13 +964,29 @@ const server = http.createServer(async (req, res) => {
         [employeeId, today]
       );
 
-      sendJson(res, 200, { today, record: dbRes.rows[0] ? mapAttendance(dbRes.rows[0], config) : null }, corsOrigin);
+      sendJson(
+        res,
+        200,
+        {
+          today,
+          record: dbRes.rows[0] ? mapAttendance(dbRes.rows[0], config) : null,
+        },
+        corsOrigin
+      );
       return;
     }
 
     if (req.method === "GET" && url.pathname === "/api/attendance/history") {
-      const employeeId = String(url.searchParams.get("employeeId") || "").trim().toUpperCase();
-      if (!employeeId) return sendJson(res, 400, { message: "employeeId is required." }, corsOrigin);
+      const employeeId = String(url.searchParams.get("employeeId") || "")
+        .trim()
+        .toUpperCase();
+      if (!employeeId)
+        return sendJson(
+          res,
+          400,
+          { message: "employeeId is required." },
+          corsOrigin
+        );
       if (!requireEmployeeSession(req, res, corsOrigin, employeeId)) return;
 
       const config = await readConfig();
@@ -722,7 +999,12 @@ const server = http.createServer(async (req, res) => {
         [employeeId]
       );
 
-      sendJson(res, 200, { records: dbRes.rows.map((row) => mapAttendance(row, config)) }, corsOrigin);
+      sendJson(
+        res,
+        200,
+        { records: dbRes.rows.map((row) => mapAttendance(row, config)) },
+        corsOrigin
+      );
       return;
     }
 
@@ -731,13 +1013,17 @@ const server = http.createServer(async (req, res) => {
 
       const month = String(url.searchParams.get("month") || "").trim();
       const search = normalizeText(url.searchParams.get("search"));
-      const department = String(url.searchParams.get("department") || "").trim();
+      const department = String(
+        url.searchParams.get("department") || ""
+      ).trim();
       const config = await readConfig();
       const { start, end, month: safeMonth } = getMonthBounds(month);
       const { page, pageSize, offset } = getPagination(url, 10);
 
       const [employeesRes, attendanceRes] = await Promise.all([
-        query("SELECT id, name, department FROM employees WHERE active = true ORDER BY id"),
+        query(
+          "SELECT id, name, department FROM employees WHERE active = true ORDER BY id"
+        ),
         query(
           `SELECT a.employee_id, a.attendance_date, a.check_in_at, a.check_out_at, a.total_hours, a.status
            FROM attendance a
@@ -781,7 +1067,8 @@ const server = http.createServer(async (req, res) => {
       }));
 
       const filteredRecords = allRecords.filter((item) => {
-        const matchesDepartment = !department || department === "All" || item.department === department;
+        const matchesDepartment =
+          !department || department === "All" || item.department === department;
         const normalizedItem = normalizeText(`${item.employeeId} ${item.name}`);
         const matchesSearch = !search || normalizedItem.includes(search);
         return matchesDepartment && matchesSearch;
@@ -824,24 +1111,60 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.method === "POST" && (url.pathname === "/api/attendance/check-in" || url.pathname === "/api/attendance/check-out")) {
+    if (
+      req.method === "POST" &&
+      (url.pathname === "/api/attendance/check-in" ||
+        url.pathname === "/api/attendance/check-out")
+    ) {
       const isCheckIn = url.pathname.endsWith("check-in");
       const body = await parseBody(req);
-      const employeeId = String(body.employeeId || "").trim().toUpperCase();
+      const employeeId = String(body.employeeId || "")
+        .trim()
+        .toUpperCase();
       const latitude = body.latitude;
       const longitude = body.longitude;
 
-      if (!employeeId) return sendJson(res, 400, { message: "Employee ID is required." }, corsOrigin);
-      const employeeSession = requireEmployeeSession(req, res, corsOrigin, employeeId);
+      if (!employeeId)
+        return sendJson(
+          res,
+          400,
+          { message: "Employee ID is required." },
+          corsOrigin
+        );
+      const employeeSession = requireEmployeeSession(
+        req,
+        res,
+        corsOrigin,
+        employeeId
+      );
       if (!employeeSession) return;
       if (typeof latitude !== "number" || typeof longitude !== "number") {
-        return sendJson(res, 400, { message: "Latitude and longitude are required." }, corsOrigin);
+        return sendJson(
+          res,
+          400,
+          { message: "Latitude and longitude are required." },
+          corsOrigin
+        );
       }
 
-      const empRes = await query("SELECT id, device_token FROM employees WHERE id = $1 AND active = true", [employeeId]);
-      if (!empRes.rows[0]) return sendJson(res, 404, { message: "Employee not found." }, corsOrigin);
+      const empRes = await query(
+        "SELECT id, device_token FROM employees WHERE id = $1 AND active = true",
+        [employeeId]
+      );
+      if (!empRes.rows[0])
+        return sendJson(
+          res,
+          404,
+          { message: "Employee not found." },
+          corsOrigin
+        );
       if (empRes.rows[0].device_token !== employeeSession.deviceToken) {
-        return sendJson(res, 403, { message: "Company laptop verification failed." }, corsOrigin);
+        return sendJson(
+          res,
+          403,
+          { message: "Company laptop verification failed." },
+          corsOrigin
+        );
       }
 
       const config = await readConfig();
@@ -850,18 +1173,28 @@ const server = http.createServer(async (req, res) => {
         return sendJson(
           res,
           403,
-          { message: "Attendance is allowed only from the office internet connection." },
+          {
+            message:
+              "Attendance is allowed only from the office internet connection.",
+          },
           corsOrigin
         );
       }
 
-      const distance = haversineMeters(latitude, longitude, config.office.latitude, config.office.longitude);
+      const distance = haversineMeters(
+        latitude,
+        longitude,
+        config.office.latitude,
+        config.office.longitude
+      );
       if (distance > config.office.radiusMeters) {
         return sendJson(
           res,
           403,
           {
-            message: `Outside office range. You are ${Math.round(distance)}m away, limit is ${config.office.radiusMeters}m.`,
+            message: `Outside office range. You are ${Math.round(
+              distance
+            )}m away, limit is ${config.office.radiusMeters}m.`,
           },
           corsOrigin
         );
@@ -877,7 +1210,13 @@ const server = http.createServer(async (req, res) => {
       const existing = existingRes.rows[0];
 
       if (isCheckIn) {
-        if (existing?.check_in_at) return sendJson(res, 409, { message: "Check-in already marked." }, corsOrigin);
+        if (existing?.check_in_at)
+          return sendJson(
+            res,
+            409,
+            { message: "Check-in already marked." },
+            corsOrigin
+          );
 
         const insertRes = await query(
           `INSERT INTO attendance (
@@ -888,22 +1227,40 @@ const server = http.createServer(async (req, res) => {
           [employeeId, today, now, latitude, longitude]
         );
 
-        sendJson(res, 200, { message: "Check-in marked successfully.", record: mapAttendance(insertRes.rows[0], config) }, corsOrigin);
+        sendJson(
+          res,
+          200,
+          {
+            message: "Check-in marked successfully.",
+            record: mapAttendance(insertRes.rows[0], config),
+          },
+          corsOrigin
+        );
         return;
       }
 
-      if (!existing?.check_in_at) return sendJson(res, 409, { message: "No check-in found for today." }, corsOrigin);
+      if (!existing?.check_in_at)
+        return sendJson(
+          res,
+          409,
+          { message: "No check-in found for today." },
+          corsOrigin
+        );
 
       if (existing.check_out_at && now <= Number(existing.check_out_at)) {
         return sendJson(
           res,
           409,
-          { message: "A later check-out is required to update the logout time." },
+          {
+            message: "A later check-out is required to update the logout time.",
+          },
           corsOrigin
         );
       }
 
-      const totalHours = Number(((now - Number(existing.check_in_at)) / (1000 * 60 * 60)).toFixed(2));
+      const totalHours = Number(
+        ((now - Number(existing.check_in_at)) / (1000 * 60 * 60)).toFixed(2)
+      );
       const updateRes = await query(
         `UPDATE attendance
          SET check_out_at = $1,
@@ -933,19 +1290,38 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 404, { message: "Route not found." }, corsOrigin);
   } catch (error) {
-    sendJson(res, 500, { message: error.message || "Unexpected server error" }, corsOrigin);
+    sendJson(
+      res,
+      500,
+      { message: error.message || "Unexpected server error" },
+      corsOrigin
+    );
   }
 });
 
 const PORT = Number(process.env.PORT || 4000);
 
-initDb()
-  .then(() => {
-    return ensureDefaultEmployees();
-  })
-  .then(() => {
-    return ensureAdminPassword();
-  })
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const initWithRetry = async (attempts = 5, delayMs = 2000) => {
+  let lastErr;
+  for (let i = 1; i <= attempts; i += 1) {
+    try {
+      console.log(`[server] initDb attempt ${i}/${attempts}`);
+      await initDb();
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.error(`[server] initDb failed: ${err.message || err}`);
+      if (i < attempts) await sleep(delayMs);
+    }
+  }
+  throw lastErr;
+};
+
+initWithRetry()
+  .then(() => ensureDefaultEmployees())
+  .then(() => ensureAdminPassword())
   .then(() => {
     server.listen(PORT, () => {
       console.log(`Attendance backend running at http://localhost:${PORT}`);
