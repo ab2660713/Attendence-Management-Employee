@@ -8,7 +8,9 @@ services:
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: attendance-postgres
+          property: connectionString
       - key: PGHOST
         sync: false
       - key: PGPORT
